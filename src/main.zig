@@ -1,5 +1,7 @@
 const std = @import("std");
+const chasen = @import("chasen");
+const lifegame_webterm = @import("lifegame_webterm");
 
-pub fn main(_: std.process.Init) !void {
-    std.debug.print("lifegame-webterm: Phase 1 model is available via the library module.\n", .{});
+pub fn main(init: std.process.Init) !void {
+    try chasen.run(init, lifegame_webterm.App.create());
 }
