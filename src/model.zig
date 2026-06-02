@@ -43,6 +43,8 @@ pub const Grid = struct {
     }
 
     pub fn get(self: Grid, x: usize, y: usize) Cell {
+        // Public accessors require in-bounds coordinates. Neighbor counting
+        // uses getOrDead below so the Life boundary rule stays explicit.
         std.debug.assert(x < self.width);
         std.debug.assert(y < self.height);
         return self.cells[self.index(x, y)];
@@ -77,6 +79,7 @@ pub const Grid = struct {
     }
 
     fn getOrDead(self: Grid, x: isize, y: isize) Cell {
+        // Bounded, non-wrapping grid: cells outside the model are dead.
         if (x < 0 or y < 0) return .dead;
 
         const ux: usize = @intCast(x);
@@ -117,6 +120,8 @@ pub const World = struct {
     }
 
     pub fn step(self: *World, allocator: std.mem.Allocator) !void {
+        // Write into a temporary buffer so every cell observes the same
+        // previous generation. Buffer reuse can be added after perf testing.
         const next = try allocator.alloc(Cell, self.grid.cells.len);
         defer allocator.free(next);
 

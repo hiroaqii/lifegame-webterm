@@ -123,6 +123,8 @@ pub const App = struct {
     }
 
     fn simulationTick(self: *App, ctx: *chasen.Ctx(Msg)) !void {
+        // A tick can still arrive after cancellation if it was already queued.
+        // Keep that stale message from advancing the model or redrawing.
         if (self.paused) {
             ctx.suppressRedraw();
             return;
@@ -143,6 +145,8 @@ pub const App = struct {
     }
 
     fn scheduleSimulation(self: *const App, ctx: *chasen.Ctx(Msg)) !void {
+        // Reusing the same timer id lets Chasen replace the active interval
+        // when speed changes while the simulation is running.
         try ctx.every(simulation_timer_id, self.speedIntervalNs(), .simulation_tick);
     }
 
@@ -151,6 +155,8 @@ pub const App = struct {
     }
 
     fn pan(self: *App, dx: i2, dy: i2) void {
+        // Pan moves the viewport/camera through the grid, not the cells
+        // themselves. The visible world therefore appears to move oppositely.
         const world = self.world orelse return;
         self.viewport_x = panAxis(self.viewport_x, world.grid.width, dx);
         self.viewport_y = panAxis(self.viewport_y, world.grid.height, dy);
@@ -166,6 +172,8 @@ pub const App = struct {
     }
 
     fn seedInitialPattern(grid: *model.Grid) void {
+        // Keep the initial blinker inside the origin viewport so first launch
+        // immediately shows live cells in a standard 80-column terminal.
         if (grid.height < 3) {
             grid.set(0, 0, .alive);
             return;

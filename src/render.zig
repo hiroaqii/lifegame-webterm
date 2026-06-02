@@ -72,6 +72,8 @@ fn gridRect(size: chasen.Size) ?chasen.Rect {
 
 fn drawGrid(surface: *chasen.Surface, rect: chasen.Rect, grid: model.Grid, viewport: Viewport) !void {
     const zoom: u16 = @max(viewport.zoom, 1);
+    // Terminal cells are usually taller than they are wide visually, so each
+    // logical Life cell spans two columns to look closer to square.
     const cell_width = zoom * 2;
     const cell_height = zoom;
     if (cell_width == 0 or cell_height == 0) return;
