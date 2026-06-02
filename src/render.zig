@@ -9,6 +9,8 @@ pub const ViewState = struct {
     viewport_x: usize,
     viewport_y: usize,
     zoom: u8,
+    speed_index: usize,
+    speed_interval_ns: u64,
 };
 
 pub fn view(surface: *chasen.Surface, state: ViewState) !void {
@@ -27,15 +29,15 @@ pub fn view(surface: *chasen.Surface, state: ViewState) !void {
 
     if (state.world) |world| {
         const mode = if (state.paused) "paused" else "running";
-        _ = try surface.printAt(0, 1, .{ .fg = .gray }, "mode: {s}  generation: {d}  population: {d}  grid: {d}x{d}  view: {d},{d}  zoom: {d}", .{
+        _ = try surface.printAt(0, 1, .{ .fg = .gray }, "{s}  gen:{d}  pop:{d}  view:{d},{d}  z:{d}  speed:{d}ms L{d}", .{
             mode,
             world.generation,
             world.population(),
-            world.grid.width,
-            world.grid.height,
             state.viewport_x,
             state.viewport_y,
             state.zoom,
+            state.speed_interval_ns / std.time.ns_per_ms,
+            state.speed_index + 1,
         });
 
         const grid_rect = gridRect(size) orelse return;
@@ -49,7 +51,7 @@ pub fn view(surface: *chasen.Surface, state: ViewState) !void {
     }
 
     const footer_row = size.height - 1;
-    _ = try surface.copyTextAt(0, footer_row, "space: pause  n: step  r: randomize  c: clear  h/j/k/l or arrows: pan  +/-: zoom  q: quit", .{ .fg = .gray });
+    _ = try surface.copyTextAt(0, footer_row, "space: run/pause  n: step  r: randomize  c: clear  h/j/k/l: pan  +/-: zoom  [/]: speed  q: quit", .{ .fg = .gray });
 }
 
 const Viewport = struct {
@@ -121,10 +123,12 @@ test "renders status summary" {
         .viewport_x = 0,
         .viewport_y = 0,
         .zoom = 1,
+        .speed_index = 1,
+        .speed_interval_ns = 250 * std.time.ns_per_ms,
     });
 
     try ts.expectCellText(0, 0, "L");
-    try ts.expectCellText(0, 1, "m");
+    try ts.expectCellText(0, 1, "p");
     try ts.expectCellText(0, 9, "s");
 }
 
@@ -143,6 +147,8 @@ test "renders visible live cells in viewport" {
         .viewport_x = 1,
         .viewport_y = 2,
         .zoom = 1,
+        .speed_index = 1,
+        .speed_interval_ns = 250 * std.time.ns_per_ms,
     });
 
     try ts.expectCellText(2, 3, "#");

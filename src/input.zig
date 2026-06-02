@@ -16,6 +16,8 @@ pub fn handleEvent(event: chasen.Event) ?app.App.Msg {
             'j', chasen.Key.down => .pan_down,
             '+', '=' => .zoom_in,
             '-' => .zoom_out,
+            ']' => .speed_up,
+            '[' => .speed_down,
             'q' => .quit,
             else => null,
         },
@@ -34,6 +36,8 @@ test "maps keyboard events to app messages" {
     try std.testing.expectEqual(app.App.Msg.pan_down, handleEvent(.{ .key_press = .{ .codepoint = chasen.Key.down } }).?);
     try std.testing.expectEqual(app.App.Msg.zoom_in, handleEvent(.{ .key_press = .{ .codepoint = '+' } }).?);
     try std.testing.expectEqual(app.App.Msg.zoom_out, handleEvent(.{ .key_press = .{ .codepoint = '-' } }).?);
+    try std.testing.expectEqual(app.App.Msg.speed_up, handleEvent(.{ .key_press = .{ .codepoint = ']' } }).?);
+    try std.testing.expectEqual(app.App.Msg.speed_down, handleEvent(.{ .key_press = .{ .codepoint = '[' } }).?);
     try std.testing.expectEqual(app.App.Msg.quit, handleEvent(.{ .key_press = .{ .codepoint = 'q' } }).?);
     try std.testing.expectEqual(@as(?app.App.Msg, null), handleEvent(.{ .key_press = .{ .codepoint = 'x' } }));
 }
