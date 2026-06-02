@@ -39,6 +39,18 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run Lifegame Webterm");
     run_step.dependOn(&run_cmd.step);
 
+    const bench_model_exe = b.addExecutable(.{
+        .name = "lifegame-webterm-bench-model",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/bench_model.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const bench_model_cmd = b.addRunArtifact(bench_model_exe);
+    const bench_model_step = b.step("bench-model", "Benchmark the backend-neutral Life model");
+    bench_model_step.dependOn(&bench_model_cmd.step);
+
     const mod_tests = b.addTest(.{
         .root_module = mod,
     });
