@@ -79,4 +79,26 @@ pub fn build(b: *std.Build) void {
 
     const check_browser_step = b.step("check-browser", "Compile the browser-only module for wasm32-freestanding");
     check_browser_step.dependOn(&browser_wasm.step);
+
+    const browser_app = b.addExecutable(.{
+        .name = "lifegame-webterm-browser",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/browser_main.zig"),
+            .target = wasm_target,
+            .optimize = optimize,
+        }),
+    });
+    browser_app.entry = .disabled;
+    browser_app.rdynamic = true;
+
+    const install_browser_wasm = b.addInstallFile(browser_app.getEmittedBin(), "web/lifegame-webterm-browser.wasm");
+    const install_browser_assets = b.addInstallDirectory(.{
+        .source_dir = b.path("web"),
+        .install_dir = .prefix,
+        .install_subdir = "web",
+    });
+
+    const web_step = b.step("web", "Build the browser prototype");
+    web_step.dependOn(&install_browser_wasm.step);
+    web_step.dependOn(&install_browser_assets.step);
 }

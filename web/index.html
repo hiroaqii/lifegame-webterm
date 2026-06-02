@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lifegame Webterm</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101416;
+        --panel: #171c1f;
+        --text: #e7ecef;
+        --muted: #8d979d;
+        --live: #68d391;
+        --border: #30383d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        background: var(--bg);
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 44px;
+        padding: 8px 12px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .keys {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      main {
+        min-height: 0;
+        padding: 12px;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #0b0f10;
+        border: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Lifegame Webterm</h1>
+      <div class="keys">Space: pause/run&nbsp;&nbsp;n: step&nbsp;&nbsp;hjkl: pan&nbsp;&nbsp;+-: zoom&nbsp;&nbsp;[]: speed&nbsp;&nbsp;r: random&nbsp;&nbsp;c: clear</div>
+    </header>
+    <main>
+      <canvas id="screen" aria-label="Lifegame grid"></canvas>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
