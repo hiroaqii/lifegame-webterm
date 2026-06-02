@@ -44,6 +44,16 @@ pub fn build(b: *std.Build) void {
     });
     const run_mod_tests = b.addRunArtifact(mod_tests);
 
+    const browser_mod = b.createModule(.{
+        .root_source_file = b.path("src/browser_root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const browser_tests = b.addTest(.{
+        .root_module = browser_mod,
+    });
+    const run_browser_tests = b.addRunArtifact(browser_tests);
+
     const exe_tests = b.addTest(.{
         .root_module = exe.root_module,
     });
@@ -51,5 +61,22 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
+    test_step.dependOn(&run_browser_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+
+    const wasm_target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
+    const browser_wasm = b.addObject(.{
+        .name = "lifegame-webterm-browser",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/browser_check.zig"),
+            .target = wasm_target,
+            .optimize = optimize,
+        }),
+    });
+
+    const check_browser_step = b.step("check-browser", "Compile the browser-only module for wasm32-freestanding");
+    check_browser_step.dependOn(&browser_wasm.step);
 }
