@@ -14,6 +14,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .imports = &.{
             .{ .name = "chasen", .module = chasen_dep.module("chasen") },
+            .{ .name = "chasen_runtime", .module = chasen_dep.module("chasen") },
         },
     });
 
@@ -26,6 +27,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "lifegame_webterm", .module = mod },
                 .{ .name = "chasen", .module = chasen_dep.module("chasen") },
+                .{ .name = "chasen_runtime", .module = chasen_dep.module("chasen") },
             },
         }),
     });
@@ -60,6 +62,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/browser_root.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "chasen_runtime", .module = chasen_dep.module("chasen_runtime") },
+        },
     });
     const browser_tests = b.addTest(.{
         .root_module = browser_mod,
@@ -86,6 +91,9 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/browser_check.zig"),
             .target = wasm_target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "chasen_runtime", .module = chasen_dep.module("chasen_runtime") },
+            },
         }),
     });
 
@@ -98,6 +106,9 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/browser_main.zig"),
             .target = wasm_target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "chasen_runtime", .module = chasen_dep.module("chasen_runtime") },
+            },
         }),
     });
     browser_app.entry = .disabled;

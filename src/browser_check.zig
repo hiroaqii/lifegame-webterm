@@ -1,5 +1,7 @@
 const std = @import("std");
+const chasen = @import("chasen_runtime");
 
+const app_core = @import("app_core.zig");
 const browser_render = @import("browser_render.zig");
 const browser_surface = @import("browser_surface.zig");
 const model = @import("model.zig");
@@ -8,10 +10,14 @@ const model = @import("model.zig");
 // function bodies lazily, so the exported function below calls the browser code
 // that we want `zig build check-browser` to compile for wasm32-freestanding.
 comptime {
+    refAllDecls(app_core);
     refAllDecls(browser_render);
     refAllDecls(browser_surface);
     refAllDecls(model);
 
+    _ = app_core.App.init;
+    _ = app_core.App.update;
+    _ = app_core.App.deinit;
     _ = browser_render.view;
     _ = browser_surface.BrowserSurface.init;
     _ = browser_surface.BrowserSurface.deinit;
@@ -37,21 +43,22 @@ pub export fn lifegame_browser_compile_check() void {
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
 
-    var world = model.World.init(allocator, 8, 8) catch unreachable;
-    defer world.deinit(allocator);
-    world.grid.set(3, 4, .alive);
-    world.step(allocator) catch unreachable;
+    var app = app_core.App.create();
+    var ctx: chasen.Ctx(app_core.App.Msg) = .{ ._allocator = allocator };
+    app.init(&ctx) catch unreachable;
+    defer app.deinit(.{ .allocator = allocator, .io = undefined });
+    app.update(.step_once, &ctx) catch unreachable;
 
     var surface = browser_surface.BrowserSurface.init(allocator, 24, 12) catch unreachable;
     defer surface.deinit(allocator);
 
     browser_render.view(&surface, .{
-        .world = world,
+        .world = app.world,
         .paused = false,
-        .viewport_x = 0,
-        .viewport_y = 0,
-        .zoom = 1,
-        .speed_index = 1,
-        .speed_interval_ns = 250 * std.time.ns_per_ms,
+        .viewport_x = app.viewport_x,
+        .viewport_y = app.viewport_y,
+        .zoom = app.zoom,
+        .speed_index = app.speed_index,
+        .speed_interval_ns = app.speedIntervalNs(),
     });
 }

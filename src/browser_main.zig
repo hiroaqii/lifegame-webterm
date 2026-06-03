@@ -1,26 +1,19 @@
 const std = @import("std");
+const chasen = @import("chasen_runtime");
 
+const app_core = @import("app_core.zig");
 const browser_render = @import("browser_render.zig");
 const browser_surface = @import("browser_surface.zig");
 const model = @import("model.zig");
 
-const default_grid_width: usize = 80;
-const default_grid_height: usize = 40;
 const max_memory_bytes = 4 * 1024 * 1024;
-const speed_intervals_ms = [_]u32{ 500, 250, 125, 62 };
-const default_cell_count = default_grid_width * default_grid_height;
+const default_cell_count = app_core.App.default_width * app_core.App.default_height;
 
 var memory: [max_memory_bytes]u8 = undefined;
 var world_snapshot: [default_cell_count]model.Cell = undefined;
 var allocator_state = std.heap.FixedBufferAllocator.init(&memory);
-var world_state: ?model.World = null;
+var app_state: app_core.App = app_core.App.create();
 var surface_state: ?browser_surface.BrowserSurface = null;
-var paused_state: bool = true;
-var viewport_x: usize = 0;
-var viewport_y: usize = 0;
-var zoom_state: u8 = 1;
-var speed_index: usize = 1;
-var random_seed: u64 = 0x6c_69_66_65_67_61_6d_65;
 
 pub export fn lifegame_init(surface_width: u32, surface_height: u32) u32 {
     cleanup();
@@ -31,15 +24,11 @@ pub export fn lifegame_init(surface_width: u32, surface_height: u32) u32 {
     const height: u16 = @intCast(@min(surface_height, std.math.maxInt(u16)));
     if (width == 0 or height == 0) return 0;
 
-    world_state = model.World.init(allocator, default_grid_width, default_grid_height) catch return 0;
+    app_state = app_core.App.create();
+    var ctx = makeCtx(allocator);
+    app_state.init(&ctx) catch return 0;
     surface_state = browser_surface.BrowserSurface.init(allocator, width, height) catch return 0;
-    seedInitialPattern(&world_state.?.grid);
 
-    paused_state = true;
-    viewport_x = 0;
-    viewport_y = 0;
-    zoom_state = 1;
-    speed_index = 1;
     render();
     return 1;
 }
@@ -48,21 +37,35 @@ pub export fn lifegame_resize(surface_width: u32, surface_height: u32) u32 {
     const width: u16 = @intCast(@min(surface_width, std.math.maxInt(u16)));
     const height: u16 = @intCast(@min(surface_height, std.math.maxInt(u16)));
     if (width == 0 or height == 0) return 0;
-    const current_world = world_state orelse return lifegame_init(width, height);
+    const current_world = app_state.world orelse return lifegame_init(width, height);
 
     // A resize changes the surface allocation size. Reset the fixed allocator
-    // and rebuild both objects so repeated browser resizes cannot fragment it.
+    // and rebuild owned objects so repeated browser resizes cannot fragment it.
     const cell_count = current_world.grid.cells.len;
     const generation = current_world.generation;
+    const paused = app_state.paused;
+    const random_seed = app_state.random_seed;
+    const viewport_x = app_state.viewport_x;
+    const viewport_y = app_state.viewport_y;
+    const zoom = app_state.zoom;
+    const speed_index = app_state.speed_index;
     @memcpy(world_snapshot[0..cell_count], current_world.grid.cells);
 
     cleanup();
     allocator_state = std.heap.FixedBufferAllocator.init(&memory);
     const allocator = allocator_state.allocator();
 
-    world_state = model.World.init(allocator, default_grid_width, default_grid_height) catch return 0;
-    @memcpy(world_state.?.grid.cells, world_snapshot[0..cell_count]);
-    world_state.?.generation = generation;
+    app_state = .{
+        .world = model.World.init(allocator, app_core.App.default_width, app_core.App.default_height) catch return 0,
+        .paused = paused,
+        .random_seed = random_seed,
+        .viewport_x = viewport_x,
+        .viewport_y = viewport_y,
+        .zoom = zoom,
+        .speed_index = speed_index,
+    };
+    @memcpy(app_state.world.?.grid.cells, world_snapshot[0..cell_count]);
+    app_state.world.?.generation = generation;
 
     surface_state = browser_surface.BrowserSurface.init(allocator, width, height) catch return 0;
     render();
@@ -70,30 +73,17 @@ pub export fn lifegame_resize(surface_width: u32, surface_height: u32) u32 {
 }
 
 pub export fn lifegame_dispatch_key(key: u32) void {
-    switch (key) {
-        ' ' => paused_state = !paused_state,
-        'n' => stepOnce(),
-        'r' => randomize(),
-        'c' => clear(),
-        'h' => pan(-1, 0),
-        'l' => pan(1, 0),
-        'k' => pan(0, -1),
-        'j' => pan(0, 1),
-        '+' => zoom_state = @min(zoom_state + 1, 4),
-        '=' => zoom_state = @min(zoom_state + 1, 4),
-        '-' => zoom_state = @max(zoom_state -| 1, 1),
-        ']' => speed_index = @min(speed_index + 1, speed_intervals_ms.len - 1),
-        '[' => speed_index = speed_index -| 1,
-        'q' => paused_state = true,
-        else => {},
-    }
+    const msg = msgForKey(key) orelse return;
+    dispatch(msg);
     render();
 }
 
 pub export fn lifegame_tick() void {
-    if (!paused_state) {
-        stepOnce();
-        render();
+    if (!app_state.paused) {
+        const ctx = dispatchWithCtx(.simulation_tick);
+        if (!ctx.redraw_suppressed) {
+            render();
+        }
     }
 }
 
@@ -128,79 +118,62 @@ pub export fn lifegame_cell_char_at(index: u32) u32 {
 }
 
 pub export fn lifegame_is_paused() u32 {
-    return if (paused_state) 1 else 0;
+    return if (app_state.paused) 1 else 0;
 }
 
 pub export fn lifegame_speed_ms() u32 {
-    return speed_intervals_ms[speed_index];
+    return @intCast(app_state.speedIntervalNs() / std.time.ns_per_ms);
+}
+
+fn msgForKey(key: u32) ?app_core.App.Msg {
+    return switch (key) {
+        ' ' => .toggle_pause,
+        'n' => .step_once,
+        'r' => .randomize,
+        'c' => .clear,
+        'h' => .pan_left,
+        'l' => .pan_right,
+        'k' => .pan_up,
+        'j' => .pan_down,
+        '+' => .zoom_in,
+        '=' => .zoom_in,
+        '-' => .zoom_out,
+        ']' => .speed_up,
+        '[' => .speed_down,
+        'q' => .quit,
+        else => null,
+    };
+}
+
+fn dispatch(msg: app_core.App.Msg) void {
+    const ctx = dispatchWithCtx(msg);
+    if (ctx.should_quit) {
+        // Browser "quit" stops the simulation instead of terminating the tab.
+        app_state.paused = true;
+    }
+}
+
+fn dispatchWithCtx(msg: app_core.App.Msg) chasen.Ctx(app_core.App.Msg) {
+    var ctx = makeCtx(allocator_state.allocator());
+    app_state.update(msg, &ctx) catch {};
+    return ctx;
 }
 
 fn render() void {
     const surface = if (surface_state) |*value| value else return;
-    const world = world_state;
     browser_render.view(surface, .{
-        .world = world,
-        .paused = paused_state,
-        .viewport_x = viewport_x,
-        .viewport_y = viewport_y,
-        .zoom = zoom_state,
-        .speed_index = speed_index,
-        .speed_interval_ns = @as(u64, speed_intervals_ms[speed_index]) * std.time.ns_per_ms,
+        .world = app_state.world,
+        .paused = app_state.paused,
+        .viewport_x = app_state.viewport_x,
+        .viewport_y = app_state.viewport_y,
+        .zoom = app_state.zoom,
+        .speed_index = app_state.speed_index,
+        .speed_interval_ns = app_state.speedIntervalNs(),
     });
 }
 
-fn stepOnce() void {
-    if (world_state) |*world| {
-        world.step(allocator_state.allocator()) catch {};
-    }
-}
-
-fn randomize() void {
-    var world = if (world_state) |*value| value else return;
-    var prng = std.Random.DefaultPrng.init(random_seed);
-    const random = prng.random();
-    for (world.grid.cells) |*cell| {
-        cell.* = if (random.uintLessThan(u8, 100) < 28) .alive else .dead;
-    }
-    world.generation = 0;
-    random_seed +%= 0x9e37_79b9_7f4a_7c15;
-}
-
-fn clear() void {
-    if (world_state) |*world| {
-        world.clear();
-    }
-    paused_state = true;
-    viewport_x = 0;
-    viewport_y = 0;
-}
-
-fn pan(dx: i2, dy: i2) void {
-    const world = world_state orelse return;
-    viewport_x = panAxis(viewport_x, world.grid.width, dx);
-    viewport_y = panAxis(viewport_y, world.grid.height, dy);
-}
-
-fn panAxis(current: usize, limit: usize, delta: i2) usize {
-    return switch (delta) {
-        -1 => current -| 1,
-        0 => current,
-        1 => if (limit == 0) current else @min(current + 1, limit - 1),
-        else => unreachable,
-    };
-}
-
-fn seedInitialPattern(grid: *model.Grid) void {
-    if (grid.height < 3) {
-        grid.set(0, 0, .alive);
-        return;
-    }
-
-    const x: usize = @min(grid.width - 1, @as(usize, 4));
-    const y: usize = @min(grid.height - 2, @as(usize, 3));
-    grid.set(x, y - 1, .alive);
-    grid.set(x, y, .alive);
-    grid.set(x, y + 1, .alive);
+fn makeCtx(allocator: std.mem.Allocator) chasen.Ctx(app_core.App.Msg) {
+    return .{ ._allocator = allocator };
 }
 
 fn cleanup() void {
@@ -208,8 +181,5 @@ fn cleanup() void {
         surface.deinit(allocator_state.allocator());
         surface_state = null;
     }
-    if (world_state) |*world| {
-        world.deinit(allocator_state.allocator());
-        world_state = null;
-    }
+    app_state.deinit(.{ .allocator = allocator_state.allocator(), .io = undefined });
 }
