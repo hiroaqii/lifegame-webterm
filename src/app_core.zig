@@ -67,7 +67,7 @@ pub const App = struct {
                 self.paused = true;
                 self.viewport_x = 0;
                 self.viewport_y = 0;
-                ctx.cancelTimer(simulation_timer_id);
+                ctx.timer().cancel(simulation_timer_id);
             },
             .pan_left => self.pan(-1, 0),
             .pan_right => self.pan(1, 0),
@@ -78,7 +78,7 @@ pub const App = struct {
             .speed_up => try self.changeSpeed(ctx, 1),
             .speed_down => try self.changeSpeed(ctx, -1),
             .quit => {
-                ctx.cancelTimer(simulation_timer_id);
+                ctx.timer().cancel(simulation_timer_id);
                 ctx.quit();
             },
         }
@@ -101,7 +101,7 @@ pub const App = struct {
     fn togglePause(self: *App, ctx: *chasen.Ctx(Msg)) !void {
         self.paused = !self.paused;
         if (self.paused) {
-            ctx.cancelTimer(simulation_timer_id);
+            ctx.timer().cancel(simulation_timer_id);
         } else {
             try self.scheduleSimulation(ctx);
         }
@@ -111,7 +111,7 @@ pub const App = struct {
         // A tick can still arrive after cancellation if it was already queued.
         // Keep that stale message from advancing the model or redrawing.
         if (self.paused) {
-            ctx.suppressRedraw();
+            ctx.frame().suppressRedraw();
             return;
         }
         if (self.world) |*world| {
@@ -132,7 +132,7 @@ pub const App = struct {
     fn scheduleSimulation(self: *const App, ctx: *chasen.Ctx(Msg)) !void {
         // Reusing the same timer id lets Chasen replace the active interval
         // when speed changes while the simulation is running.
-        try ctx.every(simulation_timer_id, self.speedIntervalNs(), .simulation_tick);
+        try ctx.timer().every(simulation_timer_id, self.speedIntervalNs(), .simulation_tick);
     }
 
     fn pan(self: *App, dx: i2, dy: i2) void {
