@@ -67,7 +67,7 @@ pub const App = struct {
                 self.paused = true;
                 self.viewport_x = 0;
                 self.viewport_y = 0;
-                ctx.timer().cancel(simulation_timer_id);
+                try ctx.timer().cancel(simulation_timer_id);
             },
             .pan_left => self.pan(-1, 0),
             .pan_right => self.pan(1, 0),
@@ -78,7 +78,7 @@ pub const App = struct {
             .speed_up => try self.changeSpeed(ctx, 1),
             .speed_down => try self.changeSpeed(ctx, -1),
             .quit => {
-                ctx.timer().cancel(simulation_timer_id);
+                try ctx.timer().cancel(simulation_timer_id);
                 ctx.quit();
             },
         }
@@ -101,7 +101,7 @@ pub const App = struct {
     fn togglePause(self: *App, ctx: *chasen.Ctx(Msg)) !void {
         self.paused = !self.paused;
         if (self.paused) {
-            ctx.timer().cancel(simulation_timer_id);
+            try ctx.timer().cancel(simulation_timer_id);
         } else {
             try self.scheduleSimulation(ctx);
         }
@@ -171,6 +171,7 @@ pub const App = struct {
 test "update toggles pause state" {
     var app = App.create();
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
+    defer ctx.clearPendingTimerEffects();
 
     try std.testing.expect(app.paused);
     try app.update(.toggle_pause, &ctx);
@@ -193,6 +194,7 @@ test "clear resets model and pauses" {
     app.paused = false;
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
+    defer ctx.clearPendingTimerEffects();
 
     try app.update(.clear, &ctx);
     try std.testing.expect(app.paused);
@@ -207,6 +209,7 @@ test "pan and zoom update viewport state" {
     defer if (app.world) |*world| world.deinit(std.testing.allocator);
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
+    defer ctx.clearPendingTimerEffects();
 
     try app.update(.pan_right, &ctx);
     try app.update(.pan_down, &ctx);
@@ -243,6 +246,7 @@ test "simulation tick advances only while running" {
     app.world.?.grid.set(2, 3, .alive);
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
+    defer ctx.clearPendingTimerEffects();
 
     try app.update(.simulation_tick, &ctx);
     try std.testing.expectEqual(@as(u64, 0), app.world.?.generation);
@@ -259,6 +263,7 @@ test "simulation tick advances only while running" {
 test "speed changes reschedule timer only while running" {
     var app = App.create();
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
+    defer ctx.clearPendingTimerEffects();
 
     try app.update(.speed_up, &ctx);
     try std.testing.expectEqual(@as(usize, 2), app.speed_index);
@@ -277,6 +282,7 @@ test "quit cancels simulation timer" {
     app.paused = false;
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
+    defer ctx.clearPendingTimerEffects();
 
     try app.update(.quit, &ctx);
 
@@ -287,9 +293,7 @@ test "quit cancels simulation timer" {
 fn resetTransient(ctx: *chasen.Ctx(App.Msg)) void {
     ctx.pending_tasks_len = 0;
     ctx.pending_tasks_with_len = 0;
-    ctx.pending_ticks_len = 0;
-    ctx.pending_everys_len = 0;
-    ctx.pending_cancels_len = 0;
+    ctx.clearPendingTimerEffects();
     ctx.redraw_suppressed = false;
     ctx.frame_requested = false;
 }
