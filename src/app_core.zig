@@ -171,7 +171,7 @@ pub const App = struct {
 test "update toggles pause state" {
     var app = App.create();
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingTimerEffects();
+    defer ctx.clearPendingEffectCopies();
 
     try std.testing.expect(app.paused);
     try app.update(.toggle_pause, &ctx);
@@ -194,7 +194,7 @@ test "clear resets model and pauses" {
     app.paused = false;
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingTimerEffects();
+    defer ctx.clearPendingEffectCopies();
 
     try app.update(.clear, &ctx);
     try std.testing.expect(app.paused);
@@ -209,7 +209,7 @@ test "pan and zoom update viewport state" {
     defer if (app.world) |*world| world.deinit(std.testing.allocator);
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingTimerEffects();
+    defer ctx.clearPendingEffectCopies();
 
     try app.update(.pan_right, &ctx);
     try app.update(.pan_down, &ctx);
@@ -246,7 +246,7 @@ test "simulation tick advances only while running" {
     app.world.?.grid.set(2, 3, .alive);
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingTimerEffects();
+    defer ctx.clearPendingEffectCopies();
 
     try app.update(.simulation_tick, &ctx);
     try std.testing.expectEqual(@as(u64, 0), app.world.?.generation);
@@ -263,7 +263,7 @@ test "simulation tick advances only while running" {
 test "speed changes reschedule timer only while running" {
     var app = App.create();
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingTimerEffects();
+    defer ctx.clearPendingEffectCopies();
 
     try app.update(.speed_up, &ctx);
     try std.testing.expectEqual(@as(usize, 2), app.speed_index);
@@ -282,7 +282,7 @@ test "quit cancels simulation timer" {
     app.paused = false;
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingTimerEffects();
+    defer ctx.clearPendingEffectCopies();
 
     try app.update(.quit, &ctx);
 
@@ -293,7 +293,7 @@ test "quit cancels simulation timer" {
 fn resetTransient(ctx: *chasen.Ctx(App.Msg)) void {
     ctx.pending_tasks_len = 0;
     ctx.pending_tasks_with_len = 0;
-    ctx.clearPendingTimerEffects();
+    ctx.clearPendingEffectCopies();
     ctx.redraw_suppressed = false;
     ctx.frame_requested = false;
 }
