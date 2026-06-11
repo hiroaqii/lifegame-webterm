@@ -111,7 +111,7 @@ pub const App = struct {
         // A tick can still arrive after cancellation if it was already queued.
         // Keep that stale message from advancing the model or redrawing.
         if (self.paused) {
-            ctx.frame().suppressRedraw();
+            ctx.redraw().skip();
             return;
         }
         if (self.world) |*world| {
