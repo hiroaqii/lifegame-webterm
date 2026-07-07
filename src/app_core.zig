@@ -171,18 +171,18 @@ pub const App = struct {
 test "update toggles pause state" {
     var app = App.create();
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingEffectCopies();
+    defer ctx.runtimeClearPendingEffectCopies();
 
     try std.testing.expect(app.paused);
     try app.update(.toggle_pause, &ctx);
     try std.testing.expect(!app.paused);
-    try std.testing.expectEqual(@as(u8, 1), ctx.pending_everys_len);
+    try std.testing.expectEqual(@as(u8, 1), ctx._pending_everys_len);
 
     resetTransient(&ctx);
 
     try app.update(.toggle_pause, &ctx);
     try std.testing.expect(app.paused);
-    try std.testing.expectEqual(@as(u8, 1), ctx.pending_cancels_len);
+    try std.testing.expectEqual(@as(u8, 1), ctx._pending_cancels_len);
 }
 
 test "clear resets model and pauses" {
@@ -194,13 +194,13 @@ test "clear resets model and pauses" {
     app.paused = false;
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingEffectCopies();
+    defer ctx.runtimeClearPendingEffectCopies();
 
     try app.update(.clear, &ctx);
     try std.testing.expect(app.paused);
     try std.testing.expectEqual(@as(usize, 0), app.world.?.population());
     try std.testing.expectEqual(@as(u64, 0), app.world.?.generation);
-    try std.testing.expectEqual(@as(u8, 1), ctx.pending_cancels_len);
+    try std.testing.expectEqual(@as(u8, 1), ctx._pending_cancels_len);
 }
 
 test "pan and zoom update viewport state" {
@@ -209,7 +209,7 @@ test "pan and zoom update viewport state" {
     defer if (app.world) |*world| world.deinit(std.testing.allocator);
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingEffectCopies();
+    defer ctx.runtimeClearPendingEffectCopies();
 
     try app.update(.pan_right, &ctx);
     try app.update(.pan_down, &ctx);
@@ -246,35 +246,35 @@ test "simulation tick advances only while running" {
     app.world.?.grid.set(2, 3, .alive);
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingEffectCopies();
+    defer ctx.runtimeClearPendingEffectCopies();
 
     try app.update(.simulation_tick, &ctx);
     try std.testing.expectEqual(@as(u64, 0), app.world.?.generation);
-    try std.testing.expect(ctx.redraw_suppressed);
+    try std.testing.expect(ctx.redrawWasSuppressed());
 
     app.paused = false;
     resetTransient(&ctx);
 
     try app.update(.simulation_tick, &ctx);
     try std.testing.expectEqual(@as(u64, 1), app.world.?.generation);
-    try std.testing.expect(!ctx.redraw_suppressed);
+    try std.testing.expect(!ctx.redrawWasSuppressed());
 }
 
 test "speed changes reschedule timer only while running" {
     var app = App.create();
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingEffectCopies();
+    defer ctx.runtimeClearPendingEffectCopies();
 
     try app.update(.speed_up, &ctx);
     try std.testing.expectEqual(@as(usize, 2), app.speed_index);
-    try std.testing.expectEqual(@as(u8, 0), ctx.pending_everys_len);
+    try std.testing.expectEqual(@as(u8, 0), ctx._pending_everys_len);
 
     app.paused = false;
     resetTransient(&ctx);
 
     try app.update(.speed_down, &ctx);
     try std.testing.expectEqual(@as(usize, 1), app.speed_index);
-    try std.testing.expectEqual(@as(u8, 1), ctx.pending_everys_len);
+    try std.testing.expectEqual(@as(u8, 1), ctx._pending_everys_len);
 }
 
 test "quit cancels simulation timer" {
@@ -282,18 +282,18 @@ test "quit cancels simulation timer" {
     app.paused = false;
 
     var ctx: chasen.Ctx(App.Msg) = .{ ._allocator = std.testing.allocator };
-    defer ctx.clearPendingEffectCopies();
+    defer ctx.runtimeClearPendingEffectCopies();
 
     try app.update(.quit, &ctx);
 
-    try std.testing.expect(ctx.should_quit);
-    try std.testing.expectEqual(@as(u8, 1), ctx.pending_cancels_len);
+    try std.testing.expect(ctx.shouldQuit());
+    try std.testing.expectEqual(@as(u8, 1), ctx._pending_cancels_len);
 }
 
 fn resetTransient(ctx: *chasen.Ctx(App.Msg)) void {
-    ctx.pending_tasks_len = 0;
-    ctx.pending_tasks_with_len = 0;
-    ctx.clearPendingEffectCopies();
-    ctx.redraw_suppressed = false;
-    ctx.frame_requested = false;
+    ctx.runtimeClearPendingEffectCopies();
+    _ = ctx.takePendingTasks();
+    _ = ctx.takePendingTasksWith();
+    ctx.resetRedrawSuppressed();
+    _ = ctx.takeFrameRequest();
 }

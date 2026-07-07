@@ -81,7 +81,7 @@ pub export fn lifegame_dispatch_key(key: u32) void {
 pub export fn lifegame_tick() void {
     if (!app_state.paused) {
         const ctx = dispatchWithCtx(.simulation_tick);
-        if (!ctx.redraw_suppressed) {
+        if (!ctx.redrawWasSuppressed()) {
             render();
         }
     }
@@ -147,7 +147,7 @@ fn msgForKey(key: u32) ?app_core.App.Msg {
 
 fn dispatch(msg: app_core.App.Msg) void {
     const ctx = dispatchWithCtx(msg);
-    if (ctx.should_quit) {
+    if (ctx.shouldQuit()) {
         // Browser "quit" stops the simulation instead of terminating the tab.
         app_state.paused = true;
     }
