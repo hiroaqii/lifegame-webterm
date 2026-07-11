@@ -24,6 +24,8 @@ pub const App = struct {
     speed_index: usize = 1,
 
     pub const Msg = union(enum) {
+        pub const undelivered_policy = .plain;
+
         toggle_pause,
         step_once,
         simulation_tick,
