@@ -294,8 +294,7 @@ test "quit cancels simulation timer" {
 
 fn resetTransient(ctx: *chasen.Ctx(App.Msg)) void {
     ctx.runtimeClearPendingEffectCopies();
-    _ = ctx.takePendingTasks();
-    _ = ctx.takePendingTasksWith();
+    ctx.discardPendingTasks();
     ctx.resetRedrawSuppressed();
     _ = ctx.takeFrameRequest();
 }

@@ -51,7 +51,7 @@ pub fn view(surface: *chasen.Surface, state: ViewState) !void {
     }
 
     const footer_row = size.height - 1;
-    _ = try surface.copyTextAt(0, footer_row, "space: run/pause  n: step  r: randomize  c: clear  h/j/k/l: pan  +/-: zoom  [/]: speed  q: quit", .{ .fg = .gray });
+    _ = try surface.copyTextAt(0, footer_row, "space: run/pause  n: step  r: randomize  c: clear  h/j/k/l: pan  +/-: zoom  [/]: speed  q: quit", .{ .bold = true });
 }
 
 const Viewport = struct {
